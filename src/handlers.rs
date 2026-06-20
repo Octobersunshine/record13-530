@@ -15,7 +15,7 @@ pub struct ExpireWithinQuery {
 }
 
 pub async fn health_check() -> impl IntoResponse {
-    (StatusCode::OK, Json(serde_json::json!({ "status": "ok" })))
+    (StatusCode::OK, Json(serde_json::json!({ "status": "ok", "timezone": "UTC" })))
 }
 
 pub async fn get_user_expiring_points(
@@ -57,16 +57,9 @@ pub async fn execute_clear_expired_points(
 ) -> impl IntoResponse {
     let days = query.days.unwrap_or(0);
     let cutoff = Utc::now() + chrono::Duration::days(days);
-    let cleared = state.clear_expired_points(cutoff).await;
+    let result = state.clear_expired_points(cutoff).await;
 
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "cleared_points": cleared,
-            "clear_before": cutoff,
-            "executed_at": Utc::now()
-        })),
-    )
+    (StatusCode::OK, Json(result))
 }
 
 pub async fn list_users(State(state): State<AppState>) -> impl IntoResponse {

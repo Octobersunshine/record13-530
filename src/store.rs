@@ -6,8 +6,12 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::models::{
-    ClearSummary, ExpiringPoint, ExpiringPointsResponse, PointRecord, User, UserClearDetail,
+    ClearResult, ClearSummary, ExpiringPoint, ExpiringPointsResponse, PointRecord, User,
+    UserClearDetail,
 };
+use crate::time_utils;
+
+pub const SYSTEM_TIMEZONE: &str = "UTC";
 
 #[derive(Clone, Default)]
 pub struct AppState {
@@ -45,7 +49,7 @@ impl AppState {
     ) -> Option<ExpiringPointsResponse> {
         let user = self.get_user(user_id).await?;
         let points = self.points.read().await;
-        let now = Utc::now();
+        let now = time_utils::now_utc();
         let cutoff = now + Duration::days(expire_within_days);
 
         let mut expiring_points: Vec<ExpiringPoint> = Vec::new();
@@ -53,7 +57,9 @@ impl AppState {
 
         for point in points.values() {
             if point.user_id == user_id && point.balance > 0 && point.expire_at <= cutoff {
-                let days_until_expiry = (point.expire_at - now).num_days();
+                let days_until_expiry =
+                    time_utils::days_until_expiry(point.expire_at, now);
+                let expire_date_utc = point.expire_at.format("%Y-%m-%d").to_string();
                 total += point.balance;
                 expiring_points.push(ExpiringPoint {
                     id: point.id,
@@ -62,6 +68,7 @@ impl AppState {
                     reason: point.reason.clone(),
                     expire_at: point.expire_at,
                     days_until_expiry,
+                    expire_date_utc,
                 });
             }
         }
@@ -73,15 +80,16 @@ impl AppState {
             username: user.username,
             total_expiring_points: total,
             expiring_points,
-            query_date: now,
+            query_time: now,
             expire_within_days,
+            timezone: SYSTEM_TIMEZONE.to_string(),
         })
     }
 
     pub async fn get_clear_summary(&self, expire_within_days: i64) -> ClearSummary {
         let users = self.users.read().await;
         let points = self.points.read().await;
-        let now = Utc::now();
+        let now = time_utils::now_utc();
         let cutoff = now + Duration::days(expire_within_days);
 
         let mut user_totals: HashMap<Uuid, i64> = HashMap::new();
@@ -111,23 +119,33 @@ impl AppState {
         ClearSummary {
             total_users: details.len(),
             total_points_to_clear: total_points,
-            clear_date: now,
+            clear_cutoff_time: cutoff,
+            query_time: now,
             expire_within_days,
+            timezone: SYSTEM_TIMEZONE.to_string(),
             details,
         }
     }
 
-    pub async fn clear_expired_points(&self, before: DateTime<Utc>) -> i64 {
+    pub async fn clear_expired_points(&self, before: DateTime<Utc>) -> ClearResult {
         let mut points = self.points.write().await;
         let mut total_cleared: i64 = 0;
+        let mut affected_users: HashMap<Uuid, bool> = HashMap::new();
 
         for point in points.values_mut() {
             if point.balance > 0 && point.expire_at <= before {
                 total_cleared += point.balance;
+                affected_users.insert(point.user_id, true);
                 point.balance = 0;
             }
         }
 
-        total_cleared
+        ClearResult {
+            cleared_points: total_cleared,
+            affected_users: affected_users.len(),
+            clear_before: before,
+            executed_at: time_utils::now_utc(),
+            timezone: SYSTEM_TIMEZONE.to_string(),
+        }
     }
 }

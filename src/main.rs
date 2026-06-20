@@ -1,6 +1,7 @@
 mod handlers;
 mod models;
 mod store;
+mod time_utils;
 
 use axum::routing::{get, post};
 use axum::Router;
@@ -17,6 +18,7 @@ async fn init_test_data(state: &AppState) {
         id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap(),
         username: "alice".to_string(),
         email: "alice@example.com".to_string(),
+        timezone: Some("Asia/Shanghai".to_string()),
         created_at: Utc::now(),
     };
 
@@ -24,6 +26,7 @@ async fn init_test_data(state: &AppState) {
         id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap(),
         username: "bob".to_string(),
         email: "bob@example.com".to_string(),
+        timezone: Some("America/New_York".to_string()),
         created_at: Utc::now(),
     };
 
@@ -31,6 +34,7 @@ async fn init_test_data(state: &AppState) {
         id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440003").unwrap(),
         username: "charlie".to_string(),
         email: "charlie@example.com".to_string(),
+        timezone: Some("Europe/London".to_string()),
         created_at: Utc::now(),
     };
 
@@ -109,9 +113,9 @@ async fn init_test_data(state: &AppState) {
     }
 
     tracing::info!("测试数据初始化完成");
-    tracing::info!("用户ID: alice -> 550e8400-e29b-41d4-a716-446655440001");
-    tracing::info!("用户ID: bob -> 550e8400-e29b-41d4-a716-446655440002");
-    tracing::info!("用户ID: charlie -> 550e8400-e29b-41d4-a716-446655440003");
+    tracing::info!("用户ID: alice (Asia/Shanghai) -> 550e8400-e29b-41d4-a716-446655440001");
+    tracing::info!("用户ID: bob (America/New_York) -> 550e8400-e29b-41d4-a716-446655440002");
+    tracing::info!("用户ID: charlie (Europe/London) -> 550e8400-e29b-41d4-a716-446655440003");
 }
 
 fn create_router(state: AppState) -> Router {
@@ -151,6 +155,7 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::info!("服务启动，监听端口: 3000");
+    tracing::info!("系统时区: UTC (所有时间均使用UTC标准时间)");
     tracing::info!("API 文档:");
     tracing::info!("  GET  /health -> 健康检查");
     tracing::info!("  GET  /users -> 获取所有用户");
