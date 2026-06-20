@@ -6,8 +6,8 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::models::{
-    ClearResult, ClearSummary, ExpiringPoint, ExpiringPointsResponse, PointRecord, User,
-    UserClearDetail,
+    ClearResult, ClearSummary, ExtendPointsResponse, ExtendedPointDetail, ExpiringPoint,
+    ExpiringPointsResponse, PointRecord, User, UserClearDetail,
 };
 use crate::time_utils;
 
@@ -147,5 +147,54 @@ impl AppState {
             executed_at: time_utils::now_utc(),
             timezone: SYSTEM_TIMEZONE.to_string(),
         }
+    }
+
+    pub async fn extend_points(
+        &self,
+        user_id: Uuid,
+        point_id: Option<Uuid>,
+        extend_days: i64,
+    ) -> Option<ExtendPointsResponse> {
+        let user = self.get_user(user_id).await?;
+        let mut points = self.points.write().await;
+        let now = time_utils::now_utc();
+
+        let mut details: Vec<ExtendedPointDetail> = Vec::new();
+        let mut total_extended: i64 = 0;
+
+        for point in points.values_mut() {
+            if point.user_id != user_id || point.balance <= 0 {
+                continue;
+            }
+
+            if let Some(pid) = point_id {
+                if point.id != pid {
+                    continue;
+                }
+            }
+
+            let original_expire_at = point.expire_at;
+            point.expire_at = point.expire_at + Duration::days(extend_days);
+
+            total_extended += point.balance;
+            details.push(ExtendedPointDetail {
+                point_id: point.id,
+                balance: point.balance,
+                reason: point.reason.clone(),
+                original_expire_at,
+                new_expire_at: point.expire_at,
+            });
+        }
+
+        Some(ExtendPointsResponse {
+            user_id: user.id,
+            username: user.username,
+            extended_count: details.len(),
+            total_extended_points: total_extended,
+            extend_days,
+            details,
+            executed_at: now,
+            timezone: SYSTEM_TIMEZONE.to_string(),
+        })
     }
 }

@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::models::ClearSummary;
+use crate::models::{ClearSummary, ExtendPointsRequest};
 use crate::store::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -72,4 +72,40 @@ pub async fn list_points(State(state): State<AppState>) -> impl IntoResponse {
     let points = state.points.read().await;
     let points: Vec<_> = points.values().cloned().collect();
     (StatusCode::OK, Json(points))
+}
+
+pub async fn extend_user_points(
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+    Json(body): Json<ExtendPointsRequest>,
+) -> impl IntoResponse {
+    let extend_days = body.extend_days.unwrap_or(30);
+
+    if extend_days <= 0 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "extend_days must be greater than 0" })),
+        );
+    }
+
+    match state.extend_points(user_id, body.point_id, extend_days).await {
+        Some(response) => {
+            if response.extended_count == 0 {
+                (
+                    StatusCode::OK,
+                    Json(serde_json::json!({
+                        "message": "No active points found to extend",
+                        "user_id": user_id,
+                        "extend_days": extend_days,
+                    })),
+                )
+            } else {
+                (StatusCode::OK, Json(serde_json::to_value(response).unwrap()))
+            }
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "User not found" })),
+        ),
+    }
 }

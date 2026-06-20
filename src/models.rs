@@ -70,3 +70,30 @@ pub struct ClearResult {
     pub executed_at: DateTime<Utc>,
     pub timezone: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtendPointsRequest {
+    pub point_id: Option<Uuid>,
+    pub extend_days: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtendedPointDetail {
+    pub point_id: Uuid,
+    pub balance: i64,
+    pub reason: String,
+    pub original_expire_at: DateTime<Utc>,
+    pub new_expire_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtendPointsResponse {
+    pub user_id: Uuid,
+    pub username: String,
+    pub extended_count: usize,
+    pub total_extended_points: i64,
+    pub extend_days: i64,
+    pub details: Vec<ExtendedPointDetail>,
+    pub executed_at: DateTime<Utc>,
+    pub timezone: String,
+}

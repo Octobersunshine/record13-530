@@ -3,7 +3,7 @@ mod models;
 mod store;
 mod time_utils;
 
-use axum::routing::{get, post};
+use axum::routing::{get, post, patch};
 use axum::Router;
 use chrono::{Duration, Utc};
 use tower_http::cors::{Any, CorsLayer};
@@ -134,6 +134,10 @@ fn create_router(state: AppState) -> Router {
         )
         .route("/clear-summary", get(handlers::get_clear_summary))
         .route("/clear-expired", post(handlers::execute_clear_expired_points))
+        .route(
+            "/users/:user_id/extend-points",
+            patch(handlers::extend_user_points),
+        )
         .layer(cors)
         .with_state(state)
 }
@@ -163,6 +167,7 @@ async fn main() {
     tracing::info!("  GET  /users/:user_id/expiring-points?days=30 -> 查询用户即将过期积分");
     tracing::info!("  GET  /clear-summary?days=30 -> 统计待清零积分总额");
     tracing::info!("  POST /clear-expired?days=0 -> 执行过期积分清零");
+    tracing::info!("  PATCH /users/:user_id/extend-points -> 延长积分有效期");
 
     axum::serve(listener, app).await.unwrap();
 }
